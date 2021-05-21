@@ -18,7 +18,7 @@ static struct zmk_hid_consumer_report consumer_report = {.report_id = 2, .body =
 // Keep track of how often a modifier was pressed.
 // Only release the modifier if the count is 0.
 static int explicit_modifier_counts[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-static zmk_mod_flags explicit_modifiers = 0;
+static zmk_mod_flags_t explicit_modifiers = 0;
 
 #define SET_MODIFIERS(mods)                                                                        \
     {                                                                                              \
@@ -26,7 +26,9 @@ static zmk_mod_flags explicit_modifiers = 0;
         LOG_DBG("Modifiers set to 0x%02X", keyboard_report.body.modifiers);                        \
     }
 
-int zmk_hid_register_mod(zmk_mod modifier) {
+zmk_mod_flags_t zmk_hid_get_explicit_mods() { return explicit_modifiers; }
+
+int zmk_hid_register_mod(zmk_mod_t modifier) {
     explicit_modifier_counts[modifier]++;
     LOG_DBG("Modifier %d count %d", modifier, explicit_modifier_counts[modifier]);
     WRITE_BIT(explicit_modifiers, modifier, true);
@@ -34,7 +36,7 @@ int zmk_hid_register_mod(zmk_mod modifier) {
     return 0;
 }
 
-int zmk_hid_unregister_mod(zmk_mod modifier) {
+int zmk_hid_unregister_mod(zmk_mod_t modifier) {
     if (explicit_modifier_counts[modifier] <= 0) {
         LOG_ERR("Tried to unregister modifier %d too often", modifier);
         return -EINVAL;
@@ -49,13 +51,33 @@ int zmk_hid_unregister_mod(zmk_mod modifier) {
     return 0;
 }
 
+int zmk_hid_register_mods(zmk_mod_flags_t modifiers) {
+    for (zmk_mod_t i = 0; i < 8; i++) {
+        if (modifiers & (1 << i)) {
+            zmk_hid_register_mod(i);
+        }
+    }
+    return 0;
+}
+
+int zmk_hid_unregister_mods(zmk_mod_flags_t modifiers) {
+    for (zmk_mod_t i = 0; i < 8; i++) {
+        if (modifiers & (1 << i)) {
+            zmk_hid_unregister_mod(i);
+        }
+    }
+    return 0;
+}
+
 #define TOGGLE_KEYBOARD(match, val)                                                                \
     for (int idx = 0; idx < ZMK_HID_KEYBOARD_NKRO_SIZE; idx++) {                                   \
         if (keyboard_report.body.keys[idx] != match) {                                             \
             continue;                                                                              \
         }                                                                                          \
         keyboard_report.body.keys[idx] = val;                                                      \
-        break;                                                                                     \
+        if (val) {                                                                                 \
+            break;                                                                                 \
+        }                                                                                          \
     }
 
 #define TOGGLE_CONSUMER(match, val)                                                                \
@@ -64,10 +86,12 @@ int zmk_hid_unregister_mod(zmk_mod modifier) {
             continue;                                                                              \
         }                                                                                          \
         consumer_report.body.keys[idx] = val;                                                      \
-        break;                                                                                     \
+        if (val) {                                                                                 \
+            break;                                                                                 \
+        }                                                                                          \
     }
 
-int zmk_hid_implicit_modifiers_press(zmk_mod_flags implicit_modifiers) {
+int zmk_hid_implicit_modifiers_press(zmk_mod_flags_t implicit_modifiers) {
     SET_MODIFIERS(explicit_modifiers | implicit_modifiers);
     return 0;
 }
@@ -77,7 +101,7 @@ int zmk_hid_implicit_modifiers_release() {
     return 0;
 }
 
-int zmk_hid_keyboard_press(zmk_key code) {
+int zmk_hid_keyboard_press(zmk_key_t code) {
     if (code >= HID_USAGE_KEY_KEYBOARD_LEFTCONTROL && code <= HID_USAGE_KEY_KEYBOARD_RIGHT_GUI) {
         return zmk_hid_register_mod(code - HID_USAGE_KEY_KEYBOARD_LEFTCONTROL);
     }
@@ -85,7 +109,7 @@ int zmk_hid_keyboard_press(zmk_key code) {
     return 0;
 };
 
-int zmk_hid_keyboard_release(zmk_key code) {
+int zmk_hid_keyboard_release(zmk_key_t code) {
     if (code >= HID_USAGE_KEY_KEYBOARD_LEFTCONTROL && code <= HID_USAGE_KEY_KEYBOARD_RIGHT_GUI) {
         return zmk_hid_unregister_mod(code - HID_USAGE_KEY_KEYBOARD_LEFTCONTROL);
     }
@@ -95,12 +119,12 @@ int zmk_hid_keyboard_release(zmk_key code) {
 
 void zmk_hid_keyboard_clear() { memset(&keyboard_report.body, 0, sizeof(keyboard_report.body)); }
 
-int zmk_hid_consumer_press(zmk_key code) {
+int zmk_hid_consumer_press(zmk_key_t code) {
     TOGGLE_CONSUMER(0U, code);
     return 0;
 };
 
-int zmk_hid_consumer_release(zmk_key code) {
+int zmk_hid_consumer_release(zmk_key_t code) {
     TOGGLE_CONSUMER(code, 0U);
     return 0;
 };

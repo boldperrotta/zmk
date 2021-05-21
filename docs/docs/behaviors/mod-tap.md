@@ -34,16 +34,16 @@ You can configure a different tapping term in your keymap:
 
 ```
 &mt {
-    tapping_term_ms = <400>;
+    tapping-term-ms = <400>;
 };
 
 / {
     keymap {
         ...
-    }
-}
+    };
+};
 ```
 
 ### Additional information
 
-The mod-tap is a [hold-tap](./hold-tap.md) under the hood with the "balanced" flavor and tapping_term_ms 200.
+The mod-tap is a [hold-tap](./hold-tap.md) under the hood with the "balanced" flavor and tapping-term-ms 200.
